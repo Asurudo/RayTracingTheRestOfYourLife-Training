@@ -1,4 +1,4 @@
-# Ray Tracing in the next Weekend-Training
+# Ray Tracing The Rest Of Your Life-Training
 
 
 ## 环境
@@ -15,4 +15,4 @@
 
 [In One Weekend](http://in1weekend.blogspot.com/)
 
-[Ray Tracing in the next Weekend 阅读笔记](https://asurudo.top/s/OVYH3PmRe)
+[Ray Tracing The Rest Of Your Life 阅读笔记](https://asurudo.top/s/zQ_OyzaCD)
