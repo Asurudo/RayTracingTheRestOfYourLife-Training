@@ -225,3 +225,34 @@ int main() {
   system("pause");
   return 0;
 }
+
+// #include <cstdio>
+// #include <cmath>
+// #include <iostream>
+// #include "jyorand.h"
+
+// using namespace std;
+
+// Rand jyorandengine;
+
+// double r(double d) {
+//     return sqrt(4.0 * d);
+// }
+
+// double q(double x) {
+//     return 0.5;
+// }
+
+// int main() {
+//     int N = 10000000;
+//     auto sum = 0.0;
+//     for (int i = 0; i < N; i++) {
+//         // r_i = r(random_double())
+//         auto ri = r(jyorandengine.jyoRandGetReal<double>(0,1));
+//         // f(r_i)p(r_i) = ri^2
+//         sum += ri*ri / q(ri);
+//     }
+//     std::cout << "I = " << sum / N << '\n';
+//     system("pause");
+//     return 0;
+// }
