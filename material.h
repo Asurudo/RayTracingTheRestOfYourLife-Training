@@ -5,6 +5,7 @@
 
 #include "hitable.h"
 #include "jyorand.h"
+#include "onb.h"
 #include "ray.h"
 #include "texture.h"
 
@@ -12,6 +13,7 @@
 struct hit_record;
 extern vec3 randomInUnitSphere();
 extern vec3 randomInHemisphere(const vec3& normal);
+extern vec3 randomCosineDirection();
 extern Rand jyorandengine;
 
 class material {
@@ -24,7 +26,8 @@ class material {
   virtual ray reflect(const ray& r_in, const hit_record& rec) const = 0;
   // 计算总共的散射光线
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered) const = 0;
+                       vec3& attenuation, ray& scattered,
+                       double& pdf) const = 0;
   // 发光函数
   virtual vec3 emitted(double u, double v, const vec3& p) const {
     // 返回纯黑，表示不发光
@@ -32,8 +35,9 @@ class material {
   }
 
   // 散射概率密度函数
-  virtual double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const{
-    return 0;
+  virtual double scattering_pdf(const ray& r_in, const hit_record& rec,
+                                const ray& scattered) const {
+    return -1.0;
   }
 };
 
@@ -45,28 +49,47 @@ class lambertian : public material {
     return ray(rec.p, unit_vector(target - (rec.p - r_in.A)), r_in.time());
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered) const override {
-    scattered = reflect(r_in, rec);
-    attenuation = textureptr->value(rec.u, rec.v, rec.p);
-    return true;
+                       vec3& attenuation, ray& scattered,
+                       double& pdf) const override {
+    // 理想的lambertian表面漫反射
+    // scattered = reflect(r_in, rec);
+    // attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    // return true;
 
-    // 均匀半球表面散射
+    // 均匀采样-半球表面散射
     // vec3 scatter_direction = randomInHemisphere(rec.normal);
     // if(scatter_direction.near_zero())
     //   scatter_direction = rec.normal;
+    // pdf = 1.0 / (2.0*PI);
     // scattered = ray(rec.p, scatter_direction, r_in.time());
     // attenuation = textureptr->value(rec.u, rec.v, rec.p);
     // return true;
+
+    // 余弦采样-半球表面散射
+    // 以法线为一轴创建一个坐标系
+    onb uvw(rec.normal);
+    // 单位半球面上按照余弦采样生成的点转化为相对坐标
+    vec3 scatter_direction = uvw.local(randomCosineDirection());
+    
+    if(scatter_direction.near_zero())
+      scatter_direction = rec.normal;
+    scattered = ray(rec.p, unit_vector(scatter_direction), r_in.time());
+    attenuation = textureptr->value(rec.u, rec.v, rec.p);
+
+    pdf = dot(uvw.w(), scattered.direction()) / PI;
+    return true;
   }
 
-  virtual double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const override{
+  virtual double scattering_pdf(const ray& r_in, const hit_record& rec,
+                                const ray& scattered) const override {
     // 表面法线与散射光线夹角的余弦值
-    double cos_theta = dot(unit_vector(rec.normal), unit_vector(scattered.direction()));
+    double cos_theta =
+        dot(unit_vector(rec.normal), unit_vector(scattered.direction()));
     // 如果小于零，代表光线往物体内部射，因此设为0
-    return cos_theta < 0 ? 0 : cos_theta / PI;
+    return (cos_theta < 0 ? 0 : cos_theta) / PI;
 
     // 均匀半球表面散射
-    return 1.0 / (2.0*PI);
+    // return 1.0 / (2.0*PI);
   }
 };
 
@@ -90,7 +113,8 @@ class metal : public material {
                r_in.time());
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered) const override {
+                       vec3& attenuation, ray& scattered,
+                       double& pdf) const override {
     scattered = reflect(r_in, rec);
     attenuation = textureptr->value(0, 0, rec.p);
     return true;
@@ -133,7 +157,8 @@ class dielectric : public material {
     return returnValue;
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered) const override {
+                       vec3& attenuation, ray& scattered,
+                       double& pdf) const override {
     // 入射介质的折射率比上折射介质的折射率
     double niOverNt, cosine, reflectProb = 1.0;
     // 折射介质的法线
@@ -175,7 +200,8 @@ class diffuse_light : public material {
     exit(0);
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered) const override {
+                       vec3& attenuation, ray& scattered,
+                       double& pdf) const override {
     return false;
   }
   virtual vec3 emitted(double u, double v, const vec3& p) const override {
@@ -193,7 +219,8 @@ class isotropic : public material {
     exit(0);
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered) const override {
+                       vec3& attenuation, ray& scattered,
+                       double& pdf) const override {
     // 往任意方向反射光线
     // 和粗糙磨砂表面的区别是，粗糙磨砂表面不会往物体内反射
     scattered = ray(rec.p, randomInUnitSphere());

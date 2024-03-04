@@ -18,6 +18,7 @@ const double PI = 3.141592653;
 #include "smoke.h"
 #include "sphere.h"
 #include "stb_image.h"
+#include "onb.h"
 #include "texture.h"
 #include "transformation.h"
 
@@ -26,6 +27,7 @@ using namespace std;
 Rand jyorandengine;
 hitable_list world;
 
+// 拒绝方法随机生成球内一点
 vec3 randomInUnitSphere() {
   vec3 p;
   do {
@@ -36,6 +38,7 @@ vec3 randomInUnitSphere() {
   return p;
 }
 
+// 拒绝方法随机生成半球内一点
 vec3 randomInHemisphere(const vec3& normal) {
     // 随机生成一个单位球内的点
     vec3 in_unit_sphere = randomInUnitSphere(); 
@@ -46,6 +49,7 @@ vec3 randomInHemisphere(const vec3& normal) {
         return -in_unit_sphere; // 否则返回该点的反方向作为散射方向
 }
 
+// 拒绝方法随机生成圆内一点
 vec3 randomInUnitDisk() {
   vec3 p;
   do {
@@ -53,6 +57,19 @@ vec3 randomInUnitDisk() {
              jyorandengine.jyoRandGetReal<double>(-1, 1), 0);
   } while (p.squared_length() >= 1.0);
   return p;
+}
+
+// 反演方法余弦采样生成半球面上一点
+vec3 randomCosineDirection() {
+    auto r1 = jyorandengine.jyoRandGetReal<double>(0,1);
+    auto r2 = jyorandengine.jyoRandGetReal<double>(0,1);
+
+    auto phi = 2*PI*r1;
+    auto x = cos(phi)*sqrt(r2);
+    auto y = sin(phi)*sqrt(r2);
+    auto z = sqrt(1-r2);
+
+    return vec3(x, y, z);
 }
 
 // 颜色着色
@@ -65,11 +82,11 @@ vec3 color(const ray& in, int depth) {
     // 材料的吸收度
     vec3 attenuation;
     vec3 emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-    if (depth < 50 && rec.mat_ptr->scatter(in, rec, attenuation, scattered)) {
+    // 入射光线概率密度函数
+    double pdf = -1.0;
+    if (depth < 50 && rec.mat_ptr->scatter(in, rec, attenuation, scattered, pdf)) {
       // 散射光线概率密度函数
       double scatteringpdf = rec.mat_ptr->scattering_pdf(in, rec, scattered);
-      // 入射光线概率密度函数
-      double pdf = scatteringpdf;
       return emitted + scatteringpdf * attenuation * color(scattered, depth + 1) / pdf;
     }
     else {
