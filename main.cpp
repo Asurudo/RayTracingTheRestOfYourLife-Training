@@ -247,30 +247,47 @@ int main() {
 // #include <cstdio>
 // #include <cmath>
 // #include <iostream>
+// #include "vec3.h"
 // #include "jyorand.h"
 
 // using namespace std;
 
 // Rand jyorandengine;
+// const double PI = 3.141592653;
 
-// double r(double d) {
-//     return sqrt(4.0 * d);
+// inline vec3 random_cosine_direction() {
+//     auto r1 = jyorandengine.jyoRandGetReal<double>(0,1);
+//     auto r2 = jyorandengine.jyoRandGetReal<double>(0,1);
+
+//     auto phi = 2*PI*r1;
+//     auto x = cos(phi)*sqrt(r2);
+//     auto y = sin(phi)*sqrt(r2);
+//     auto z = sqrt(1-r2);
+
+//     return vec3(x, y, z);
 // }
 
-// double q(double x) {
-//     return 0.5;
+// double f(const vec3& d) {
+//     double cos_theta = d.z();
+//     return cos_theta*cos_theta*cos_theta;
+// }
+
+// double q(const vec3& d) {
+//     return d.z()/PI;
 // }
 
 // int main() {
 //     int N = 10000000;
 //     auto sum = 0.0;
 //     for (int i = 0; i < N; i++) {
-//         // r_i = r(random_double())
-//         auto ri = r(jyorandengine.jyoRandGetReal<double>(0,1));
-//         // f(r_i)p(r_i) = ri^2
-//         sum += ri*ri / q(ri);
+//         vec3 d = random_cosine_direction();
+//         // 余弦分布的概率密度函数
+//         sum += f(d) / q(d);
 //     }
-//     std::cout << "I = " << sum / N << '\n';
+//     // 标准答案
+//     std::cout << "PI/2 = " << PI / 2.0 << '\n';
+//     // 均匀分布采样答案
+//     std::cout << "Estimate = " << sum / N << '\n';
 //     system("pause");
 //     return 0;
 // }
