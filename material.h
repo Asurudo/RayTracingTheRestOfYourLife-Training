@@ -11,6 +11,7 @@
 // 前向声明
 struct hit_record;
 extern vec3 randomInUnitSphere();
+extern vec3 randomInHemisphere(const vec3& normal);
 extern Rand jyorandengine;
 
 class material {
@@ -21,11 +22,18 @@ class material {
   material(texture* a) : textureptr(a) {}
   // 计算反射光线
   virtual ray reflect(const ray& r_in, const hit_record& rec) const = 0;
+  // 计算总共的散射光线
   virtual bool scatter(const ray& r_in, const hit_record& rec,
                        vec3& attenuation, ray& scattered) const = 0;
+  // 发光函数
   virtual vec3 emitted(double u, double v, const vec3& p) const {
     // 返回纯黑，表示不发光
     return vec3(0, 0, 0);
+  }
+
+  // 散射概率密度函数
+  virtual double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const{
+    return 0;
   }
 };
 
@@ -41,6 +49,24 @@ class lambertian : public material {
     scattered = reflect(r_in, rec);
     attenuation = textureptr->value(rec.u, rec.v, rec.p);
     return true;
+
+    // 均匀半球表面散射
+    // vec3 scatter_direction = randomInHemisphere(rec.normal);
+    // if(scatter_direction.near_zero())
+    //   scatter_direction = rec.normal;
+    // scattered = ray(rec.p, scatter_direction, r_in.time());
+    // attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    // return true;
+  }
+
+  virtual double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const override{
+    // 表面法线与散射光线夹角的余弦值
+    double cos_theta = dot(unit_vector(rec.normal), unit_vector(scattered.direction()));
+    // 如果小于零，代表光线往物体内部射，因此设为0
+    return cos_theta < 0 ? 0 : cos_theta / PI;
+
+    // 均匀半球表面散射
+    return 1.0 / (2.0*PI);
   }
 };
 

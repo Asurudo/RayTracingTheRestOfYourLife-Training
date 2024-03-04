@@ -36,6 +36,16 @@ vec3 randomInUnitSphere() {
   return p;
 }
 
+vec3 randomInHemisphere(const vec3& normal) {
+    // 随机生成一个单位球内的点
+    vec3 in_unit_sphere = randomInUnitSphere(); 
+    // 如果点在法线方向的半球上
+    if (dot(in_unit_sphere, normal) > 0.0) 
+        return in_unit_sphere; // 返回该点作为散射方向
+    else
+        return -in_unit_sphere; // 否则返回该点的反方向作为散射方向
+}
+
 vec3 randomInUnitDisk() {
   vec3 p;
   do {
@@ -55,8 +65,13 @@ vec3 color(const ray& in, int depth) {
     // 材料的吸收度
     vec3 attenuation;
     vec3 emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-    if (depth < 50 && rec.mat_ptr->scatter(in, rec, attenuation, scattered))
-      return emitted + attenuation * color(scattered, depth + 1);
+    if (depth < 50 && rec.mat_ptr->scatter(in, rec, attenuation, scattered)) {
+      // 散射光线概率密度函数
+      double scatteringpdf = rec.mat_ptr->scattering_pdf(in, rec, scattered);
+      // 入射光线概率密度函数
+      double pdf = scatteringpdf;
+      return emitted + scatteringpdf * attenuation * color(scattered, depth + 1) / pdf;
+    }
     else {
       // 直视光源则可以看到光源原本的颜色
       // if (!depth) emitted.make_unit_vector();
@@ -100,7 +115,7 @@ void buildWorld() {
   unsigned char* tex_data = stbi_load("earthmap.jpg", &nx, &ny, &nn, 0);
   texture* imagetextureptr = new image_texture(tex_data, nx, ny);
 
-   worldlist.emplace_back(
+  worldlist.emplace_back(
       new rectangle_yz(0, 555, 0, 555, 555, new lambertian(redptr)));
   worldlist.emplace_back(
       new rectangle_yz(0, 555, 0, 555, 0, new lambertian(greenptr)));
@@ -112,17 +127,16 @@ void buildWorld() {
       new rectangle_xz(0, 555, 0, 555, 0, new lambertian(whiteptr)));
   worldlist.emplace_back(
       new rectangle_xy(0, 555, 0, 555, 555, new lambertian(whiteptr)));
-  worldlist.emplace_back(
-      new translate(new rotate_y(new box(vec3(0, 0, 0), vec3(165, 165, 165),
-                                         new lambertian(whiteptr)),
-                                 -18),
-                    vec3(130, 0, 65)));
-  worldlist.emplace_back(
-      new translate(new rotate_y(new box(vec3(0, 0, 0), vec3(165, 330, 165),
-                                         new lambertian(whiteptr)),
-                                 15),
-                    vec3(265, 0, 295)));
-
+  worldlist.emplace_back(new translate(
+      new rotate_y(
+          new box(vec3(0, 0, 0), vec3(165, 165, 165), new lambertian(whiteptr)),
+          -18),
+      vec3(130, 0, 65)));
+  worldlist.emplace_back(new translate(
+      new rotate_y(
+          new box(vec3(0, 0, 0), vec3(165, 330, 165), new lambertian(whiteptr)),
+          15),
+      vec3(265, 0, 295)));
 
   // 从世界列表中创建bvh树
   shared_ptr<hitable> rootptr;
@@ -195,8 +209,12 @@ int main() {
       for (int dj = 0; dj < sqrtns; dj++)
         for (int di = 0; di < sqrtns; di++) {
           // 蒙特卡洛-抖动采样，将像素划分成更密的小格子，每个格子里随机取一个点采样
-          double uplus = -0.5 + resqrtns * ((double)di + jyorandengine.jyoRandGetReal<double>(-1, 1)); 
-          double vplus = -0.5 + resqrtns * ((double)dj + jyorandengine.jyoRandGetReal<double>(-1, 1));
+          double uplus =
+              -0.5 + resqrtns * ((double)di +
+                                 jyorandengine.jyoRandGetReal<double>(-1, 1));
+          double vplus =
+              -0.5 + resqrtns * ((double)dj +
+                                 jyorandengine.jyoRandGetReal<double>(-1, 1));
 
           // 点(u,v)是点(i,j)的反离散化
           double u = (double(i) + uplus) / double(nx);
