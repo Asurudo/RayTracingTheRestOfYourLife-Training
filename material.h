@@ -29,7 +29,7 @@ class material {
                        vec3& attenuation, ray& scattered,
                        double& pdf) const = 0;
   // 发光函数
-  virtual vec3 emitted(double u, double v, const vec3& p) const {
+  virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u, double v, const vec3& p) const {
     // 返回纯黑，表示不发光
     return vec3(0, 0, 0);
   }
@@ -76,7 +76,7 @@ class lambertian : public material {
     scattered = ray(rec.p, unit_vector(scatter_direction), r_in.time());
     attenuation = textureptr->value(rec.u, rec.v, rec.p);
 
-    pdf = dot(uvw.w(), scattered.direction()) / PI;
+    pdf = dot(unit_vector(uvw.w()), unit_vector(scattered.direction())) / PI;
     return true;
   }
 
@@ -204,9 +204,11 @@ class diffuse_light : public material {
                        double& pdf) const override {
     return false;
   }
-  virtual vec3 emitted(double u, double v, const vec3& p) const override {
-    // 返回材质颜色
-    return textureptr->value(u, v, p);
+  virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u, double v, const vec3& p) const override {
+    // 保证光源只向下发射光线
+    if(dot(vec3(0, -1, 0), r_in.direction()) < 0.0)
+      return textureptr->value(u, v, p);
+    return vec3(0, 0, 0);
   }
 };
 
@@ -225,7 +227,13 @@ class isotropic : public material {
     // 和粗糙磨砂表面的区别是，粗糙磨砂表面不会往物体内反射
     scattered = ray(rec.p, randomInUnitSphere());
     attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    pdf = 1 / (4*PI);
     return true;
+  }
+
+  virtual double scattering_pdf(const ray& r_in, const hit_record& rec,
+                                const ray& scattered) const override {
+    return 1 / (4*PI);
   }
 };
 

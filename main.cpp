@@ -81,13 +81,36 @@ vec3 color(const ray& in, int depth) {
     ray scattered;
     // 材料的吸收度
     vec3 attenuation;
-    vec3 emitted = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
-    // 入射光线概率密度函数
+    vec3 emitted = rec.mat_ptr->emitted(in, rec, rec.u, rec.v, rec.p);
     double pdf = -1.0;
     if (depth < 50 && rec.mat_ptr->scatter(in, rec, attenuation, scattered, pdf)) {
+      // 强势硬编码，接管光线处理
+      // 光源上随机一点
+      vec3 on_light = vec3(jyorandengine.jyoRandGetReal<double>(213, 343), 554, jyorandengine.jyoRandGetReal<double>(227, 332));
+      // 接触点到光源的射线
+      vec3 to_light = on_light - rec.p;
+      // 接触点到光源上一点的平方
+      auto distance_squard = to_light.squared_length();
+      // 单位化变成单位向量
+      to_light = unit_vector(to_light);
+      
+      // 夹角为钝角，光源在物体背面，届不到
+      if(dot(to_light, rec.normal) < 0)
+        return emitted;
+
+      double light_area = (343-213) * (332-227);
+      // 单位向量巧妙计算夹角
+      double light_cosine = fabs(to_light.y());
+      // 如果光源和物体表面平行，也算届不到
+      if(light_cosine < 1e-5)
+        return emitted;
+
+      pdf = distance_squard / (light_area * light_cosine);
+      scattered = ray(rec.p, to_light, in.time());
+
       // 散射光线概率密度函数
       double scatteringpdf = rec.mat_ptr->scattering_pdf(in, rec, scattered);
-      return emitted + scatteringpdf * attenuation * color(scattered, depth + 1) / pdf;
+      return emitted +  scatteringpdf * attenuation * color(scattered, depth + 1) / pdf;
     }
     else {
       // 直视光源则可以看到光源原本的颜色
@@ -193,7 +216,7 @@ int main() {
   // 画布的宽
   int ny = 400;
   // 画布某一点的采样数量
-  int ns = 100;
+  int ns = 10;
 
   buildWorld();
   vec3 lookfrom(278, 278, -800), lookat(278, 278, 0);
