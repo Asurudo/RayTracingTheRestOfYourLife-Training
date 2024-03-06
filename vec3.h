@@ -3,8 +3,12 @@
 
 #include <math.h>
 #include <stdlib.h>
-
 #include <iostream>
+
+#include "jyorand.h"
+
+// 前向声明
+extern Rand jyorandengine;
 
 class vec3 {
  public:

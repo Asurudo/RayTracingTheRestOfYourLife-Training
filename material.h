@@ -6,6 +6,7 @@
 #include "hitable.h"
 #include "jyorand.h"
 #include "onb.h"
+#include "pdf.h"
 #include "ray.h"
 #include "texture.h"
 
@@ -29,7 +30,8 @@ class material {
                        vec3& attenuation, ray& scattered,
                        double& pdf) const = 0;
   // 发光函数
-  virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u, double v, const vec3& p) const {
+  virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u,
+                       double v, const vec3& p) const {
     // 返回纯黑，表示不发光
     return vec3(0, 0, 0);
   }
@@ -51,32 +53,18 @@ class lambertian : public material {
   virtual bool scatter(const ray& r_in, const hit_record& rec,
                        vec3& attenuation, ray& scattered,
                        double& pdf) const override {
-    // 理想的lambertian表面漫反射
+    // 不考虑pdf的漫反射
     // scattered = reflect(r_in, rec);
     // attenuation = textureptr->value(rec.u, rec.v, rec.p);
     // return true;
 
-    // 均匀采样-半球表面散射
-    // vec3 scatter_direction = randomInHemisphere(rec.normal);
-    // if(scatter_direction.near_zero())
-    //   scatter_direction = rec.normal;
-    // pdf = 1.0 / (2.0*PI);
-    // scattered = ray(rec.p, scatter_direction, r_in.time());
-    // attenuation = textureptr->value(rec.u, rec.v, rec.p);
-    // return true;
+    mixture_pdf mixed_pdf(std::make_shared<hitable_pdf>(rec.p, rec.normal),
+                          std::make_shared<cosine_pdf>(rec.normal), 0.8);
 
-    // 余弦采样-半球表面散射
-    // 以法线为一轴创建一个坐标系
-    onb uvw(rec.normal);
-    // 单位半球面上按照余弦采样生成的点转化为相对坐标
-    vec3 scatter_direction = uvw.local(randomCosineDirection());
-    
-    if(scatter_direction.near_zero())
-      scatter_direction = rec.normal;
-    scattered = ray(rec.p, unit_vector(scatter_direction), r_in.time());
+    scattered = ray(rec.p, mixed_pdf.generate(), r_in.time());
     attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    pdf = mixed_pdf.value(scattered.direction());
 
-    pdf = dot(unit_vector(uvw.w()), unit_vector(scattered.direction())) / PI;
     return true;
   }
 
@@ -204,9 +192,10 @@ class diffuse_light : public material {
                        double& pdf) const override {
     return false;
   }
-  virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u, double v, const vec3& p) const override {
+  virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u,
+                       double v, const vec3& p) const override {
     // 保证光源只向下发射光线
-    if(dot(vec3(0, -1, 0), r_in.direction()) < 0.0)
+    if (dot(vec3(0, -1, 0), r_in.direction()) < 0.0)
       return textureptr->value(u, v, p);
     return vec3(0, 0, 0);
   }
@@ -227,13 +216,13 @@ class isotropic : public material {
     // 和粗糙磨砂表面的区别是，粗糙磨砂表面不会往物体内反射
     scattered = ray(rec.p, randomInUnitSphere());
     attenuation = textureptr->value(rec.u, rec.v, rec.p);
-    pdf = 1 / (4*PI);
+    pdf = 1 / (4 * PI);
     return true;
   }
 
   virtual double scattering_pdf(const ray& r_in, const hit_record& rec,
                                 const ray& scattered) const override {
-    return 1 / (4*PI);
+    return 1 / (4 * PI);
   }
 };
 

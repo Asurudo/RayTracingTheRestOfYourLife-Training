@@ -1,10 +1,11 @@
 #ifndef TEXTUREH
 #define TEXTUREH
 
-// 前向声明
-extern Rand jyorandengine;
 
 #include "perlin.h"
+
+// 前向声明
+extern Rand jyorandengine;
 
 class texture {
  public:
