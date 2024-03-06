@@ -78,18 +78,19 @@ vec3 color(const ray& in, int depth) {
   hit_record rec;
   // 减少误差，-0.00001也可以是交点
   if (world.hitanythingbvh(in, 0.001, DBL_MAX, rec)) {
-    // 反射出来的光线
-    ray scattered;
-    // 材料的吸收度
-    vec3 attenuation;
+    scatter_record srec;
     vec3 emitted = rec.mat_ptr->emitted(in, rec, rec.u, rec.v, rec.p);
-    double pdf = -1.0;
-    if (depth < 50 && rec.mat_ptr->scatter(in, rec, attenuation, scattered, pdf)) {
+    if (depth < 50 && rec.mat_ptr->scatter(in, rec, srec)) {
+      
+      // 金属和玻璃材质跳过pdf
+      if(srec.skip_pdf)
+        return srec.attenuation * color(srec.out_ray, depth + 1);
+      
       // 散射光线概率密度函数
-      double scatteringpdf = rec.mat_ptr->scattering_pdf(in, rec, scattered);
-      if(pdf <= 0.0)
+      double scatteringpdf = rec.mat_ptr->scattering_pdf(in, rec, srec.out_ray);
+      if(srec.pdf <= 0.0)
         return emitted;
-      return emitted +  scatteringpdf * attenuation * color(scattered, depth + 1) / pdf;
+      return emitted +  scatteringpdf * srec.attenuation * color(srec.out_ray, depth + 1) / srec.pdf;
     }
     else {
       // 直视光源则可以看到光源原本的颜色
@@ -111,12 +112,13 @@ vec3 color(const ray& in, int depth) {
 
 std::vector<shared_ptr<hitable>> worldlist;
 void buildWorld() {
-  texture* whitelightptr = new constant_texture(vec3(170, 170, 170));
+  texture* whitelightptr = new constant_texture(vec3(17, 17, 17));
   texture* mikuptr = new constant_texture(vec3(0.223, 0.773, 0.733));
   texture* redptr = new constant_texture(vec3(0.65, 0.05, 0.05));
   texture* whiteptr = new constant_texture(vec3(0.73, 0.73, 0.73));
   texture* greenptr = new constant_texture(vec3(0.12, 0.45, 0.15));
   texture* groundtexptr = new constant_texture(vec3(0.48, 0.83, 0.53));
+  texture* metalptr = new constant_texture(vec3(0.8, 0.85, 0.88));
 
   texture* checkertextptr =
       new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)),
@@ -154,7 +156,7 @@ void buildWorld() {
       vec3(130, 0, 65)));
   worldlist.emplace_back(new translate(
       new rotate_y(
-          new box(vec3(0, 0, 0), vec3(165, 330, 165), new lambertian(whiteptr)),
+          new box(vec3(0, 0, 0), vec3(165, 330, 165), new metal(metalptr, 0.0)),
           15),
       vec3(265, 0, 295)));
 

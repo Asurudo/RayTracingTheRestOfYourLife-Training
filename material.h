@@ -17,6 +17,14 @@ extern vec3 randomInHemisphere(const vec3& normal);
 extern vec3 randomCosineDirection();
 extern Rand jyorandengine;
 
+class scatter_record{
+  public: 
+    vec3 attenuation;
+    double pdf;
+    ray out_ray;
+    bool skip_pdf;
+};
+
 class material {
  public:
   // 材质指针
@@ -27,8 +35,7 @@ class material {
   virtual ray reflect(const ray& r_in, const hit_record& rec) const = 0;
   // 计算总共的散射光线
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered,
-                       double& pdf) const = 0;
+                       scatter_record& srec) const = 0;
   // 发光函数
   virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u,
                        double v, const vec3& p) const {
@@ -51,8 +58,7 @@ class lambertian : public material {
     return ray(rec.p, unit_vector(target - (rec.p - r_in.A)), r_in.time());
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered,
-                       double& pdf) const override {
+                       scatter_record& srec) const override {
     // 不考虑pdf的漫反射
     // scattered = reflect(r_in, rec);
     // attenuation = textureptr->value(rec.u, rec.v, rec.p);
@@ -61,9 +67,10 @@ class lambertian : public material {
     mixture_pdf mixed_pdf(std::make_shared<hitable_pdf>(rec.p, rec.normal),
                           std::make_shared<cosine_pdf>(rec.normal), 0.8);
 
-    scattered = ray(rec.p, mixed_pdf.generate(), r_in.time());
-    attenuation = textureptr->value(rec.u, rec.v, rec.p);
-    pdf = mixed_pdf.value(scattered.direction());
+    srec.out_ray = ray(rec.p, mixed_pdf.generate(), r_in.time());
+    srec.attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    srec.pdf = mixed_pdf.value(srec.out_ray.direction());
+    srec.skip_pdf = false;
 
     return true;
   }
@@ -101,10 +108,10 @@ class metal : public material {
                r_in.time());
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered,
-                       double& pdf) const override {
-    scattered = reflect(r_in, rec);
-    attenuation = textureptr->value(0, 0, rec.p);
+                       scatter_record& srec) const override {
+    srec.out_ray = reflect(r_in, rec);
+    srec.attenuation = textureptr->value(0, 0, rec.p);
+    srec.skip_pdf = true;
     return true;
   }
 };
@@ -145,8 +152,7 @@ class dielectric : public material {
     return returnValue;
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered,
-                       double& pdf) const override {
+                       scatter_record& srec) const override {
     // 入射介质的折射率比上折射介质的折射率
     double niOverNt, cosine, reflectProb = 1.0;
     // 折射介质的法线
@@ -154,7 +160,7 @@ class dielectric : public material {
     // 折射光线与反射光线
     ray refracted, reflected = reflect(r_in, rec);
     // 反射率永远为1，因为折射的电解质材料不吸收任何光线，全部反射出去
-    attenuation = vec3(1.0, 1.0, 1.0);
+    srec.attenuation = vec3(1.0, 1.0, 1.0);
 
     // 光线和法线呈锐角
     if (dot(r_in.direction(), rec.normal) > 0) {
@@ -172,10 +178,10 @@ class dielectric : public material {
       reflectProb = schlick(cosine, refIdx);
 
     // 将反射量看作概率，随机一下，如果落在概率内，则返回反射光线，否则返回折射光线
-    scattered = ((jyorandengine.jyoRandGetReal<double>(0, 1) < reflectProb)
+    srec.out_ray = ((jyorandengine.jyoRandGetReal<double>(0, 1) < reflectProb)
                      ? reflected
                      : refracted);
-
+    srec.skip_pdf = true;
     return true;
   }
 };
@@ -188,8 +194,7 @@ class diffuse_light : public material {
     exit(0);
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered,
-                       double& pdf) const override {
+                       scatter_record& srec) const override {
     return false;
   }
   virtual vec3 emitted(const ray& r_in, const hit_record& rec, double u,
@@ -210,13 +215,13 @@ class isotropic : public material {
     exit(0);
   }
   virtual bool scatter(const ray& r_in, const hit_record& rec,
-                       vec3& attenuation, ray& scattered,
-                       double& pdf) const override {
+                       scatter_record& srec) const override {
     // 往任意方向反射光线
     // 和粗糙磨砂表面的区别是，粗糙磨砂表面不会往物体内反射
-    scattered = ray(rec.p, randomInUnitSphere());
-    attenuation = textureptr->value(rec.u, rec.v, rec.p);
-    pdf = 1 / (4 * PI);
+    srec.out_ray = ray(rec.p, randomInUnitSphere());
+    srec.attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    srec.pdf = 1 / (4 * PI);
+    srec.skip_pdf = false;
     return true;
   }
 
