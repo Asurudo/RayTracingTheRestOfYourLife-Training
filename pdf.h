@@ -69,7 +69,7 @@ class hitable_pdf : public pdf {
   hitable_pdf(const vec3& p, const vec3& normal) : p(p), normal(normal) {}
 
   virtual double value(const vec3& direction) override {
-    // // 夹角为钝角，光源在物体背面，届不到
+    // 夹角为钝角，光源在物体背面，届不到
     if (dot(direction, normal) < 0) return -1;
     // 光源面积
     double light_area = (343 - 213) * (332 - 227);
@@ -91,6 +91,46 @@ class hitable_pdf : public pdf {
     // 计算接触点到光源上一点的平方
     distance_squard = to_light.squared_length();
     return to_light = unit_vector(to_light);
+  }
+};
+
+class sphere_dielectric_pdf : public pdf{
+  private:
+    vec3 p;
+    vec3 normal;
+    // 球体硬编码
+    vec3 center;
+    double radius;
+    // 均匀采样从任意点可见的球体的一侧
+    vec3 random_to_sphere(double distace_squared){
+      double r1 = jyorandengine.jyoRandGetReal<double>(0, 1);
+      double r2 = jyorandengine.jyoRandGetReal<double>(0, 1);
+      double z = 1 + r2 * (sqrt(1-radius*radius/distace_squared) - 1);
+
+      double phi = 2*PI*r1;
+      double x = cos(phi)*sqrt(1-z*z);
+      double y = sin(phi)*sqrt(1-z*z);
+
+      return vec3(x, y, z);
+    }
+  public:
+   sphere_dielectric_pdf(const vec3& p, const vec3& normal) : normal(normal), p(p), center(190.0, 90.0, 190.0), radius(90.0) {}
+
+  virtual double value(const vec3& direction) override {
+    // 夹角为钝角，球体在物体背面，届不到
+    if (dot(direction, normal) < 0) return -1;
+    
+    double cos_theta_max = sqrt(1 - radius*radius/(center-p).squared_length());
+    double solid_angle = 2*PI*(1-cos_theta_max);
+
+    return 1.0 / solid_angle;
+  }
+
+  virtual vec3 generate() override {
+    vec3 direction = center - p;
+    double distance_squared = direction.squared_length();
+    onb uvw(direction);
+    return unit_vector(uvw.local(random_to_sphere(distance_squared)));
   }
 };
 

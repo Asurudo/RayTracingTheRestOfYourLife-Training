@@ -64,14 +64,24 @@ class lambertian : public material {
     // attenuation = textureptr->value(rec.u, rec.v, rec.p);
     // return true;
 
+    // 光源采样与球体玻璃混合采样
     mixture_pdf mixed_pdf(std::make_shared<hitable_pdf>(rec.p, rec.normal),
-                          std::make_shared<cosine_pdf>(rec.normal), 0.8);
-
+                          std::make_shared<sphere_dielectric_pdf>(rec.p, rec.normal));
     srec.out_ray = ray(rec.p, mixed_pdf.generate(), r_in.time());
     srec.attenuation = textureptr->value(rec.u, rec.v, rec.p);
     srec.pdf = mixed_pdf.value(srec.out_ray.direction());
     srec.skip_pdf = false;
-
+    
+    // 球体玻璃采样
+    // sphere_dielectric_pdf sdpdf(rec.p, rec.normal);
+    // srec.out_ray = ray(rec.p, sdpdf.generate(), r_in.time());
+    // srec.attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    // srec.pdf = sdpdf.value(srec.out_ray.direction());
+    // srec.skip_pdf = false;
+    // // 射不到球体就别射了
+    // if(srec.pdf <= 0.0)
+    //     srec.out_ray = reflect(r_in, rec), srec.skip_pdf = true;
+    
     return true;
   }
 
@@ -82,9 +92,6 @@ class lambertian : public material {
         dot(unit_vector(rec.normal), unit_vector(scattered.direction()));
     // 如果小于零，代表光线往物体内部射，因此设为0
     return (cos_theta < 0 ? 0 : cos_theta) / PI;
-
-    // 均匀半球表面散射
-    // return 1.0 / (2.0*PI);
   }
 };
 

@@ -13,13 +13,13 @@ const double PI = 3.141592653;
 #include "jyorand.h"
 #include "kuinkerm.h"
 #include "material.h"
+#include "onb.h"
+#include "pdf.h"
 #include "perlin.h"
 #include "rectangle.h"
 #include "smoke.h"
 #include "sphere.h"
 #include "stb_image.h"
-#include "onb.h"
-#include "pdf.h"
 #include "texture.h"
 #include "transformation.h"
 
@@ -41,13 +41,13 @@ vec3 randomInUnitSphere() {
 
 // 拒绝方法随机生成半球内一点
 vec3 randomInHemisphere(const vec3& normal) {
-    // 随机生成一个单位球内的点
-    vec3 in_unit_sphere = randomInUnitSphere(); 
-    // 如果点在法线方向的半球上
-    if (dot(in_unit_sphere, normal) > 0.0) 
-        return in_unit_sphere; // 返回该点作为散射方向
-    else
-        return -in_unit_sphere; // 否则返回该点的反方向作为散射方向
+  // 随机生成一个单位球内的点
+  vec3 in_unit_sphere = randomInUnitSphere();
+  // 如果点在法线方向的半球上
+  if (dot(in_unit_sphere, normal) > 0.0)
+    return in_unit_sphere;  // 返回该点作为散射方向
+  else
+    return -in_unit_sphere;  // 否则返回该点的反方向作为散射方向
 }
 
 // 拒绝方法随机生成圆内一点
@@ -62,15 +62,15 @@ vec3 randomInUnitDisk() {
 
 // 反演方法余弦采样生成半球面上一点
 vec3 randomCosineDirection() {
-    auto r1 = jyorandengine.jyoRandGetReal<double>(0,1);
-    auto r2 = jyorandengine.jyoRandGetReal<double>(0,1);
+  auto r1 = jyorandengine.jyoRandGetReal<double>(0, 1);
+  auto r2 = jyorandengine.jyoRandGetReal<double>(0, 1);
 
-    auto phi = 2*PI*r1;
-    auto x = cos(phi)*sqrt(r2);
-    auto y = sin(phi)*sqrt(r2);
-    auto z = sqrt(1-r2);
+  auto phi = 2 * PI * r1;
+  auto x = cos(phi) * sqrt(r2);
+  auto y = sin(phi) * sqrt(r2);
+  auto z = sqrt(1 - r2);
 
-    return vec3(x, y, z);
+  return vec3(x, y, z);
 }
 
 // 颜色着色
@@ -81,18 +81,16 @@ vec3 color(const ray& in, int depth) {
     scatter_record srec;
     vec3 emitted = rec.mat_ptr->emitted(in, rec, rec.u, rec.v, rec.p);
     if (depth < 50 && rec.mat_ptr->scatter(in, rec, srec)) {
-      
       // 金属和玻璃材质跳过pdf
-      if(srec.skip_pdf)
+      if (srec.skip_pdf)
         return srec.attenuation * color(srec.out_ray, depth + 1);
-      
+
       // 散射光线概率密度函数
       double scatteringpdf = rec.mat_ptr->scattering_pdf(in, rec, srec.out_ray);
-      if(srec.pdf <= 0.0)
-        return emitted;
-      return emitted +  scatteringpdf * srec.attenuation * color(srec.out_ray, depth + 1) / srec.pdf;
-    }
-    else {
+      if (srec.pdf <= 0.0) return emitted;
+      return emitted + scatteringpdf * srec.attenuation *
+                           color(srec.out_ray, depth + 1) / srec.pdf;
+    } else {
       // 直视光源则可以看到光源原本的颜色
       // if (!depth) emitted.make_unit_vector();
       return emitted;
@@ -112,14 +110,13 @@ vec3 color(const ray& in, int depth) {
 
 std::vector<shared_ptr<hitable>> worldlist;
 void buildWorld() {
-  texture* whitelightptr = new constant_texture(vec3(17, 17, 17));
+  texture* whitelightptr = new constant_texture(vec3(170, 170, 170));
   texture* mikuptr = new constant_texture(vec3(0.223, 0.773, 0.733));
   texture* redptr = new constant_texture(vec3(0.65, 0.05, 0.05));
   texture* whiteptr = new constant_texture(vec3(0.73, 0.73, 0.73));
   texture* greenptr = new constant_texture(vec3(0.12, 0.45, 0.15));
   texture* groundtexptr = new constant_texture(vec3(0.48, 0.83, 0.53));
   texture* metalptr = new constant_texture(vec3(0.8, 0.85, 0.88));
-
   texture* checkertextptr =
       new checker_texture(new constant_texture(vec3(0.2, 0.3, 0.1)),
                           new constant_texture(vec3(0.9, 0.9, 0.9)));
@@ -149,14 +146,17 @@ void buildWorld() {
       new rectangle_xz(0, 555, 0, 555, 0, new lambertian(whiteptr)));
   worldlist.emplace_back(
       new rectangle_xy(0, 555, 0, 555, 555, new lambertian(whiteptr)));
+  // worldlist.emplace_back(new translate(
+  //     new rotate_y(
+  //         new box(vec3(0, 0, 0), vec3(165, 165, 165), new
+  //         lambertian(whiteptr)), -18),
+  //     vec3(130, 0, 65)));
+  worldlist.emplace_back(
+      new sphere(vec3(190, 90, 190), 90, new dielectric(1.5)));
+
   worldlist.emplace_back(new translate(
       new rotate_y(
-          new box(vec3(0, 0, 0), vec3(165, 165, 165), new lambertian(whiteptr)),
-          -18),
-      vec3(130, 0, 65)));
-  worldlist.emplace_back(new translate(
-      new rotate_y(
-          new box(vec3(0, 0, 0), vec3(165, 330, 165), new metal(metalptr, 0.0)),
+          new box(vec3(0, 0, 0), vec3(165, 330, 165), new lambertian(whiteptr)),
           15),
       vec3(265, 0, 295)));
 
@@ -248,11 +248,16 @@ int main() {
         }
       // 取颜色的平均值
       col /= double(ns);
+      // 消除坏点
+      col.e[0] = max(col.e[0], 0.0), col.e[0] = min(col.e[0], 170.0);
+      col.e[1] = max(col.e[1], 0.0), col.e[1] = min(col.e[1], 170.0);
+      col.e[2] = max(col.e[2], 0.0), col.e[2] = min(col.e[2], 170.0);
       // gamma2修正，提升画面的质量
       col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
       int ir = int(255.99 * col[0]);
       int ig = int(255.99 * col[1]);
       int ib = int(255.99 * col[2]);
+      ir = max(0, ir), ig = max(0, ig), ib = max(0, ib);
       ir = min(ir, 255), ig = min(ig, 255), ib = min(ib, 255);
       stringstream ss;
       ss << ir << " " << ig << " " << ib << "\n";
