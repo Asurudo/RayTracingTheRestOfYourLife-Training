@@ -110,7 +110,7 @@ vec3 color(const ray& in, int depth) {
 
 std::vector<shared_ptr<hitable>> worldlist;
 void buildWorld() {
-  texture* whitelightptr = new constant_texture(vec3(170, 170, 170));
+  texture* whitelightptr = new constant_texture(vec3(50, 50, 50));
   texture* mikuptr = new constant_texture(vec3(0.223, 0.773, 0.733));
   texture* redptr = new constant_texture(vec3(0.65, 0.05, 0.05));
   texture* whiteptr = new constant_texture(vec3(0.73, 0.73, 0.73));
@@ -194,11 +194,11 @@ int main() {
     mout.open("output.PPM", ios::app);
 
   // 画布的长
-  int nx = 800;
+  int nx = 1000;
   // 画布的宽
-  int ny = 400;
+  int ny = 500;
   // 画布某一点的采样数量
-  int ns = 100;
+  int ns = 1000;
 
   buildWorld();
   vec3 lookfrom(278, 278, -800), lookat(278, 278, 0);
@@ -244,14 +244,16 @@ int main() {
 
           // 一条射向画布上点(u,v)的光线，注意(u,v)不是真实坐标而是在画布上的比例位置
           ray r = cam.get_ray(u, v);
-          col += color(r, 0);
+          vec3 cr = color(r, 0);
+          cr.e[0] = max(cr.e[0], 0.0), cr.e[0] = min(cr.e[0], 1.0);
+          cr.e[1] = max(cr.e[1], 0.0), cr.e[1] = min(cr.e[1], 1.0);
+          cr.e[2] = max(cr.e[2], 0.0), cr.e[2] = min(cr.e[2], 1.0);
+          col += cr;
         }
       // 取颜色的平均值
       col /= double(ns);
       // 消除坏点
-      col.e[0] = max(col.e[0], 0.0), col.e[0] = min(col.e[0], 170.0);
-      col.e[1] = max(col.e[1], 0.0), col.e[1] = min(col.e[1], 170.0);
-      col.e[2] = max(col.e[2], 0.0), col.e[2] = min(col.e[2], 170.0);
+      
       // gamma2修正，提升画面的质量
       col = vec3(sqrt(col[0]), sqrt(col[1]), sqrt(col[2]));
       int ir = int(255.99 * col[0]);

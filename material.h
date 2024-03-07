@@ -60,13 +60,16 @@ class lambertian : public material {
   virtual bool scatter(const ray& r_in, const hit_record& rec,
                        scatter_record& srec) const override {
     // 不考虑pdf的漫反射
-    // scattered = reflect(r_in, rec);
-    // attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    // srec.out_ray = reflect(r_in, rec);
+    // srec.attenuation = textureptr->value(rec.u, rec.v, rec.p);
+    // srec.skip_pdf = true;
     // return true;
+    
 
     // 光源采样与球体玻璃混合采样
-    mixture_pdf mixed_pdf(std::make_shared<hitable_pdf>(rec.p, rec.normal),
-                          std::make_shared<sphere_dielectric_pdf>(rec.p, rec.normal));
+    mixture_pdf mixed_pdf(std::make_shared<mixture_pdf> (std::make_shared<hitable_pdf>(rec.p, rec.normal),
+                          std::make_shared<cosine_pdf>(rec.normal), 0.8),
+                          std::make_shared<sphere_dielectric_pdf>(rec.p, rec.normal), 0.95);
     srec.out_ray = ray(rec.p, mixed_pdf.generate(), r_in.time());
     srec.attenuation = textureptr->value(rec.u, rec.v, rec.p);
     srec.pdf = mixed_pdf.value(srec.out_ray.direction());
